@@ -9,9 +9,13 @@ WALLET = os.getenv("WALLET_ADDRESS")
 
 async def start(update, context):
     await update.message.reply_text(
-        "Привет! Я Polymarket бот.\n"
-        "Используй /balance чтобы узнать суммарный баланс и текущие позиции.\n"
-        "Используй /positions чтобы увидеть все позиции подробно."
+        "<b>Привет!</b> Я Polymarket бот. 🌟\n\n"
+        "<i>Используй команды, чтобы получить информацию:</i>\n\n"
+        "🔹 <b>/balance</b> — узнать суммарный баланс и текущие позиции.\n"
+        "🔹 <b>/positions</b> — получить подробную информацию о всех позициях.\n\n"
+        "Я помогу отслеживать твои активы на Polymarket! 🚀"
+        "\n\n<i>Просто введи команду, и я дам все данные! 📊</i>",
+        parse_mode="HTML"
     )
 
 async def balance(update, context):
@@ -110,7 +114,6 @@ async def positions(update, context):
             )
 
         await update.message.reply_text("\n".join(text_lines), parse_mode="HTML")
-
 
 # запуск
 app = ApplicationBuilder().token(TOKEN).build()
