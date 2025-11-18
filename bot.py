@@ -41,13 +41,15 @@ async def balance(update, context):
 
 # /positions — красиво + корректный расчёт инвестиций
 async def positions(update, context):
-    positions = get_positions(WALLET, limit=200)  # можно больше
+    positions = get_positions(WALLET, limit=200)
 
     if not positions or len(positions) == 0:
         await update.message.reply_text("Позиции отсутствуют.")
         return
 
     formatted_positions = []
+    total_invested = 0
+    total_current_value = 0
 
     for pos in positions:
         title = pos.get("title", "Неизвестная позиция")
@@ -60,29 +62,54 @@ async def positions(update, context):
         pnl = current_value - invested
         pnl_percent = (pnl / invested * 100) if invested > 0 else 0
 
-        # --- Фильтрация нежелательных позиций ---
         if pnl_percent <= -99:
             continue
 
-        msg = (
-            f"📌 <b>{title}</b>\n\n"
-            f"💰 Инвестировано: <b>${invested:.2f}</b>\n"
-            f"💎 Стоимость сейчас: <b>${current_value:.2f}</b>\n"
-            f"{'📈' if pnl >= 0 else '📉'} P&L: <b>{pnl:+.2f}$ ({pnl_percent:+.1f}%)</b>"
-        )
+        formatted_positions.append({
+            "title": title,
+            "invested": invested,
+            "current_value": current_value,
+            "pnl": pnl,
+            "pnl_percent": pnl_percent
+        })
 
-        formatted_positions.append(msg)
+        total_invested += invested
+        total_current_value += current_value
 
     if not formatted_positions:
         await update.message.reply_text("Нет актуальных активных позиций.")
         return
 
+    total_pnl = total_current_value - total_invested
+    total_pnl_percent = (total_pnl / total_invested * 100) if total_invested > 0 else 0
+
+    # --- Сортировка по P&L по убыванию ---
+    formatted_positions.sort(key=lambda x: x["pnl"], reverse=True)
+
     # --- Разбиваем на батчи по 15 ---
     batch_size = 15
     for i in range(0, len(formatted_positions), batch_size):
         batch = formatted_positions[i:i + batch_size]
-        text = "\n\n".join(batch)
-        await update.message.reply_text(text, parse_mode="HTML")
+        text_lines = []
+
+        # Сводка только в первом сообщении
+        if i == 0:
+            text_lines.append(
+                f"<b>Сумма инвестиций:</b> <i>{total_invested:.2f}$</i>\n"
+                f"<b>Стоимость сейчас:</b> <i>{total_current_value:.2f}$</i>\n"
+                f"<b>Общий P&L:</b> <i>{total_pnl:+.2f}$ ({total_pnl_percent:+.1f}%)</i>\n"
+                "-------------------------------------"
+            )
+
+        for pos in batch:
+            text_lines.append(
+                f"<b>📌 {pos['title']}</b>\n"
+                f"<i>Инвестировано:</i> {pos['invested']:.2f}$\n"
+                f"<i>Стоимость сейчас:</i> {pos['current_value']:.2f}$\n"
+                f"<i>P&L:</i> {pos['pnl']:+.2f}$ ({pos['pnl_percent']:+.1f}%)\n"
+            )
+
+        await update.message.reply_text("\n".join(text_lines), parse_mode="HTML")
 
 
 # запуск
