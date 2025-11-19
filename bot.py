@@ -19,8 +19,8 @@ async def start(update, context):
     )
 
 async def balance(update, context):
-    data = get_total_value(WALLET)
-    if not data or len(data) == 0:
+    data = get_total_value(WALLET)  # Removed `await` here
+    if not data:
         await update.message.reply_text("Не удалось получить баланс.")
         return
 
@@ -28,32 +28,18 @@ async def balance(update, context):
     user_address = user_info.get("user", "Неизвестен")
     value = user_info.get("value", 0)
 
-    msg = f"Адрес: {user_address}\nСуммарный баланс: {value:.2f} USD\n\nТекущие позиции:\n"
-
-    positions = get_positions(WALLET)
-    if not positions or len(positions) == 0:
-        msg += "Позиции отсутствуют."
-    else:
-        for pos in positions[:10]:
-            title = pos.get("title", "Неизвестно")
-            size = pos.get("size", 0)
-            cur_price = pos.get("curPrice", 0)
-            total_value = size * cur_price
-            msg += f"- {title}: {size} токенов × {cur_price:.2f} USD = {total_value:.2f} USD\n"
-
+    msg = f"Адрес: {user_address}\nСуммарный баланс: {value:.2f} USD"
     await update.message.reply_text(msg)
 
-# /positions — красиво + корректный расчёт инвестиций
 async def positions(update, context):
-    positions = get_positions(WALLET, limit=200)
+    positions = get_positions(WALLET, limit=200)  # Removed `await` here
 
-    if not positions or len(positions) == 0:
+    if not positions:
         await update.message.reply_text("Позиции отсутствуют.")
         return
 
     formatted_positions = []
-    total_invested = 0
-    total_current_value = 0
+    total_invested, total_current_value = 0, 0
 
     for pos in positions:
         title = pos.get("title", "Неизвестная позиция")
@@ -87,17 +73,16 @@ async def positions(update, context):
     total_pnl = total_current_value - total_invested
     total_pnl_percent = (total_pnl / total_invested * 100) if total_invested > 0 else 0
 
-    # --- Сортировка по P&L по убыванию ---
+    # Sort by P&L in descending order
     formatted_positions.sort(key=lambda x: x["pnl"], reverse=True)
 
-    # --- Разбиваем на батчи по 15 ---
+    # Split into batches of 15
     batch_size = 15
     for i in range(0, len(formatted_positions), batch_size):
         batch = formatted_positions[i:i + batch_size]
         text_lines = []
 
-        # Сводка только в первом сообщении
-        if i == 0:
+        if i == 0:  # Summary only in the first message
             text_lines.append(
                 f"<b>Сумма инвестиций:</b> <i>{total_invested:.2f}$</i>\n"
                 f"<b>Стоимость сейчас:</b> <i>{total_current_value:.2f}$</i>\n"
@@ -115,7 +100,7 @@ async def positions(update, context):
 
         await update.message.reply_text("\n".join(text_lines), parse_mode="HTML")
 
-# запуск
+# Start the bot
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("balance", balance))
