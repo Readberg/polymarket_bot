@@ -43,3 +43,5 @@ def make_request(url: str):
     except Exception as e:
         print(f"Request error: {e}")
         return None
+    
+

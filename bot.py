@@ -1,27 +1,71 @@
 from telegram.ext import ApplicationBuilder, CommandHandler
 from dotenv import load_dotenv
 import os
-from api import get_total_value, get_positions
+from api import get_total_value, get_positions  # Импорт функции для работы с API
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-WALLET = os.getenv("WALLET_ADDRESS")
+
+# Хранение адресов кошельков пользователей в памяти
+user_wallets = {}
+
+def is_valid_address(address: str) -> bool:
+    """
+    Проверка, что адрес имеет правильный формат.
+    """
+    return address.strip().startswith("0x") and len(address.strip()) == 42
 
 async def start(update, context):
     await update.message.reply_text(
         "<b>Привет!</b> Я Polymarket бот. 🌟\n\n"
         "<i>Используй команды, чтобы получить информацию:</i>\n\n"
         "🔹 <b>/balance</b> — узнать суммарный баланс и текущие позиции.\n"
-        "🔹 <b>/positions</b> — получить подробную информацию о всех позициях.\n\n"
+        "🔹 <b>/positions</b> — получить подробную информацию о всех позициях.\n"
+        "🔹 <b>/set_wallet</b> — установить свой адрес кошелька.\n"
+        "🔹 <b>/remove_wallet</b> — удалить свой адрес кошелька.\n\n"
         "Я помогу отслеживать твои активы на Polymarket! 🚀"
         "\n\n<i>Просто введи команду, и я дам все данные! 📊</i>",
         parse_mode="HTML"
     )
 
+async def set_wallet(update, context):
+    user_id = update.message.from_user.id
+    wallet_address = ' '.join(context.args)
+
+    if not wallet_address:
+        await update.message.reply_text("Пожалуйста, предоставьте свой адрес кошелька после команды /set_wallet. Например: /set_wallet 0x123abc...")
+        return
+
+    # Проверка на корректность адреса (передаем в функцию is_valid_address)
+    if not is_valid_address(wallet_address):
+        await update.message.reply_text("Неверный формат адреса! Адрес должен начинаться с '0x' и иметь длину 42 символа.")
+        return
+
+    # Сохраняем адрес для пользователя
+    user_wallets[user_id] = wallet_address
+    await update.message.reply_text(f"Адрес кошелька успешно сохранён: {wallet_address}")
+
+async def remove_wallet(update, context):
+    user_id = update.message.from_user.id
+
+    # Проверяем, есть ли кошелек в памяти
+    if user_id in user_wallets:
+        del user_wallets[user_id]
+        await update.message.reply_text("Адрес кошелька успешно удалён.")
+    else:
+        await update.message.reply_text("У вас нет сохранённого адреса кошелька.")
+
 async def balance(update, context):
-    data = get_total_value(WALLET)  # Removed `await` here
+    user_id = update.message.from_user.id
+    wallet_address = user_wallets.get(user_id)
+
+    if not wallet_address:
+        await update.message.reply_text("Пожалуйста, сначала установите свой адрес кошелька командой /set_wallet.")
+        return
+
+    data = get_total_value(wallet_address)
     if not data:
-        await update.message.reply_text("Не удалось получить баланс.")
+        await update.message.reply_text("Не удалось получить баланс, проверьте формат адреса.")
         return
 
     user_info = data[0]
@@ -32,8 +76,14 @@ async def balance(update, context):
     await update.message.reply_text(msg)
 
 async def positions(update, context):
-    positions = get_positions(WALLET, limit=200)  # Removed `await` here
+    user_id = update.message.from_user.id
+    wallet_address = user_wallets.get(user_id)
 
+    if not wallet_address:
+        await update.message.reply_text("Пожалуйста, сначала установите свой адрес кошелька командой /set_wallet.")
+        return
+
+    positions = get_positions(wallet_address, limit=200)
     if not positions:
         await update.message.reply_text("Позиции отсутствуют.")
         return
@@ -105,5 +155,7 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("balance", balance))
 app.add_handler(CommandHandler("positions", positions))
+app.add_handler(CommandHandler("set_wallet", set_wallet))
+app.add_handler(CommandHandler("remove_wallet", remove_wallet))
 
 app.run_polling()
